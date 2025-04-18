@@ -1,0 +1,306 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row =>
+                    row.some(cell => cell !== '' && cell !== null && cell !== undefined)
+                );
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CV Builder</title>
+  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/babel-standalone@7.22.10/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/i18next@23.5.1/dist/umd/i18next.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-i18next@13.2.2/dist/umd/react-i18next.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .rtl { direction: rtl; }
+    .ltr { direction: ltr; }
+  </style>
+</head>
+<body class="bg-gray-100">
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    const { useTranslation, I18nextProvider } = ReactI18next;
+
+    // Initialize i18next
+    i18next.init({
+      lng: 'en',
+      resources: {
+        en: {
+          translation: {
+            title: 'CV Builder',
+            name: 'Full Name',
+            email: 'Email',
+            phone: 'Phone',
+            country: 'Country',
+            education: 'Education',
+            experience: 'Work Experience',
+            skills: 'Skills',
+            select_language: 'Select Language',
+            select_country: 'Select Country',
+            generate_cv: 'Generate CV',
+            download_pdf: 'Download PDF',
+            us_template: 'US CV Template',
+            fr_template: 'France CV Template',
+            uae_template: 'UAE CV Template'
+          }
+        },
+        fr: {
+          translation: {
+            title: 'Créateur de CV',
+            name: 'Nom complet',
+            email: 'E-mail',
+            phone: 'Téléphone',
+            country: 'Pays',
+            education: 'Éducation',
+            experience: 'Expérience professionnelle',
+            skills: 'Compétences',
+            select_language: 'Choisir la langue',
+            select_country: 'Choisir le pays',
+            generate_cv: 'Générer le CV',
+            download_pdf: 'Télécharger en PDF',
+            us_template: 'Modèle de CV américain',
+            fr_template: 'Modèle de CV français',
+            uae_template: 'Modèle de CV émirati'
+          }
+        },
+        ar: {
+          translation: {
+            title: 'صانع السيرة الذاتية',
+            name: 'الاسم الكامل',
+            email: 'البريد الإلكتروني',
+            phone: 'الهاتف',
+            country: 'الدولة',
+            education: 'التعليم',
+            experience: 'الخبرة العملية',
+            skills: 'المهارات',
+            select_language: 'اختر اللغة',
+            select_country: 'اختر الدولة',
+            generate_cv: 'إنشاء السيرة الذاتية',
+            download_pdf: 'تحميل بصيغة PDF',
+            us_template: 'نموذج السيرة الذاتية الأمريكية',
+            fr_template: 'نموذج السيرة الذاتية الفرنسية',
+            uae_template: 'نموذج السيرة الذاتية الإماراتية'
+          }
+        }
+      }
+    });
+
+    // Main App Component
+    function App() {
+      const { t, i18n } = useTranslation();
+      const [formData, setFormData] = useState({
+        name: '',
+        email: '',
+        phone: '',
+        education: '',
+        experience: '',
+        skills: ''
+      });
+      const [country, setCountry] = useState('us');
+      const [cvContent, setCvContent] = useState(null);
+
+      // Handle form input changes
+      const handleInputChange = (e) => {
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+      };
+
+      // Handle language change
+      const handleLanguageChange = (lang) => {
+        i18n.changeLanguage(lang);
+      };
+
+      // Handle country change
+      const handleCountryChange = (e) => {
+        setCountry(e.target.value);
+      };
+
+      // Generate CV preview
+      const generateCV = () => {
+        let template;
+        if (country === 'us') {
+          template = (
+            <div className="p-6 bg-white shadow-md">
+              <h2 className="text-2xl font-bold">{t('us_template')}</h2>
+              <p><strong>{t('name')}:</strong> {formData.name}</p>
+              <p><strong>{t('email')}:</strong> {formData.email}</p>
+              <p><strong>{t('phone')}:</strong> {formData.phone}</p>
+              <p><strong>{t('education')}:</strong> {formData.education}</p>
+              <p><strong>{t('experience')}:</strong> {formData.experience}</p>
+              <p><strong>{t('skills')}:</strong> {formData.skills}</p>
+            </div>
+          );
+        } else if (country === 'fr') {
+          template = (
+            <div className="p-6 bg-white shadow-md">
+              <h2 className="text-2xl font-bold">{t('fr_template')}</h2>
+              <p><strong>{t('name')}:</strong> {formData.name}</p>
+              <p><strong>{t('email')}:</strong> {formData.email}</p>
+              <p><strong>{t('phone')}:</strong> {formData.phone}</p>
+              <p><strong>{t('education')}:</strong> {formData.education}</p>
+              <p><strong>{t('experience')}:</strong> {formData.experience}</p>
+              <p><strong>{t('skills')}:</strong> {formData.skills}</p>
+            </div>
+          );
+        } else if (country === 'uae') {
+          template = (
+            <div className="p-6 bg-white shadow-md">
+              <h2 className="text-2xl font-bold">{t('uae_template')}</h2>
+              <p><strong>{t('name')}:</strong> {formData.name}</p>
+              <p><strong>{t('email')}:</strong> {formData.email}</p>
+              <p><strong>{t('phone')}:</strong> {formData.phone}</p>
+              <p><strong>{t('education')}:</strong> {formData.education}</p>
+              <p><strong>{t('experience')}:</strong> {formData.experience}</p>
+              <p><strong>{t('skills')}:</strong> {formData.skills}</p>
+            </div>
+          );
+        }
+        setCvContent(template);
+      };
+
+      // Download CV as PDF
+      const downloadPDF = () => {
+        const element = document.getElementById('cv-preview');
+        html2pdf().from(element).save('cv.pdf');
+      };
+
+      // Set direction based on language
+      const isRtl = i18n.language === 'ar';
+      const directionClass = isRtl ? 'rtl' : 'ltr';
+
+      return (
+        <div className={`container mx-auto p-4 ${directionClass}`}>
+          <h1 className="text-3xl font-bold mb-4">{t('title')}</h1>
+
+          {/* Language Selector */}
+          <div className="mb-4">
+            <label className="mr-2">{t('select_language')}:</label>
+            <select onChange={(e) => handleLanguageChange(e.target.value)} className="p-2 border rounded">
+              <option value="en">English</option>
+              <option value="fr">Français</option>
+              <option value="ar">العربية</option>
+            </select>
+          </div>
+
+          {/* Country Selector */}
+          <div className="mb-4">
+            <label className="mr-2">{t('select_country')}:</label>
+            <select onChange={handleCountryChange} className="p-2 border rounded">
+              <option value="us">United States</option>
+              <option value="fr">France</option>
+              <option value="uae">UAE</option>
+            </select>
+          </div>
+
+          {/* Input Form */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <input
+              type="text"
+              name="name"
+              placeholder={t('name')}
+              value={formData.name}
+              onChange={handleInputChange}
+              className="p-2 border rounded"
+            />
+            <input
+              type="email"
+              name="email"
+              placeholder={t('email')}
+              value={formData.email}
+              onChange={handleInputChange}
+              className="p-2 border rounded"
+            />
+            <input
+              type="text"
+              name="phone"
+              placeholder={t('phone')}
+              value={formData.phone}
+              onChange={handleInputChange}
+              className="p-2 border rounded"
+            />
+            <textarea
+              name="education"
+              placeholder={t('education')}
+              value={formData.education}
+              onChange={handleInputChange}
+              className="p-2 border rounded"
+            />
+            <textarea
+              name="experience"
+              placeholder={t('experience')}
+              value={formData.experience}
+              onChange={handleInputChange}
+              className="p-2 border rounded"
+            />
+            <textarea
+              name="skills"
+              placeholder={t('skills')}
+              value={formData.skills}
+              onChange={handleInputChange}
+              className="p-2 border rounded"
+            />
+          </div>
+
+          {/* Generate CV Button */}
+          <button
+            onClick={generateCV}
+            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 mb-4"
+          >
+            {t('generate_cv')}
+          </button>
+
+          {/* CV Preview */}
+          {cvContent && (
+            <div id="cv-preview" className="mt-4">
+              {cvContent}
+              <button
+                onClick={downloadPDF}
+                className="mt-4 bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+              >
+                {t('download_pdf')}
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Render the app
+    ReactDOM.render(
+      <I18nextProvider i18n={i18next}>
+        <App />
+      </I18nextProvider>,
+      document.getElementById('root')
+    );
+  </script>
+</body>
+</html>
